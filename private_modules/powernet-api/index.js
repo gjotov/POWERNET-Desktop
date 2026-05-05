@@ -62,7 +62,7 @@ async function getFullData(login, password) {
 
 function getAllCameras() {
     try {
-        const dumpPath = path.join(process.cwd(), 'powernet_map_dump.json');
+        const dumpPath = path.join(__dirname, 'powernet_map_dump.json');
         if (!fs.existsSync(dumpPath)) {
             console.error("!!! DUMP FILE NOT FOUND AT:", dumpPath);
             return [];
