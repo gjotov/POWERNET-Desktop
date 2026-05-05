@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>POWERNET Desktop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+        :root { --accent: #ffae00; --bg: #050505; --panel: #0a0a0a; --border: #1a1a1a; }
+        body { background: var(--bg); color: #fff; font-family: 'Space Mono', monospace; text-transform: uppercase; margin: 0; padding: 3rem; }
+        .btn-action { border: 1px solid var(--border); padding: 0.5rem 1rem; font-size: 10px; letter-spacing: 2px; transition: all 0.2s; cursor: pointer; background: transparent; color: white; }
+        .btn-action:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+        .nav-btn { color: #444; font-size: 10px; letter-spacing: 2px; transition: 0.2s; background: none; border: none; cursor: pointer; padding: 10px; }
+        .nav-btn.active { color: var(--accent); border-bottom: 1px solid var(--accent); }
+        .station-card { background: var(--panel); border: 1px solid var(--border); padding: 1.5rem; position: relative; transition: border-color 0.3s; }
+        .station-card:hover { border-color: var(--accent); }
+        .station-card.online { border-left: 3px solid #00ffaa; }
+        .input-dark { background: #000; border: 1px solid var(--border); padding: 1rem; color: var(--accent); outline: none; font-size: 12px; width: 100%; }
+        .input-dark:focus { border-color: var(--accent); }
+        
+        .scanner { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--accent); opacity: 0.2; box-shadow: 0 0 15px var(--accent); animation: scan 3s linear infinite; pointer-events: none; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="flex justify-between items-start mb-12 border-b border-white/5 pb-8">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tighter">STATION_<span class="text-amber-500">OS</span></h1>
+            <div class="flex gap-6 mt-4">
+                <button id="nav-dashboard" onclick="switchView('dashboard')" class="nav-btn active">DASHBOARD</button>
+                <button id="nav-cameras" onclick="switchView('cameras')" class="nav-btn">CAMERA_MAP</button>
+            </div>
+        </div>
+        <button onclick="toggleModal('addModal', true)" class="btn-action">[+ ADD_UNIT ]</button>
+    </header>
+
+    <!-- VIEWS -->
+    <div id="dashboardView">
+        <div id="grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </div>
+    
+    <div id="camerasView" class="hidden">
+        <input onkeyup="filterCameras(this.value)" placeholder="SEARCH_BY_LOCATION..." class="input-dark mb-8">
+        <div id="camerasGrid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+    </div>
+
+    <!-- MODAL ADD ACCOUNT -->
+    <div id="addModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6">
+        <div class="bg-[#0a0a0a] border border-white/10 p-8 w-full max-w-sm">
+            <p class="text-[10px] text-amber-500 mb-6 font-bold tracking-widest">// REGISTRATION_PROTOCOL</p>
+            <div class="flex flex-col gap-4">
+                <input id="inAddr" type="text" placeholder="NAME" class="input-dark">
+                <input id="inLogin" type="text" placeholder="LOGIN" class="input-dark">
+                <input id="inPass" type="password" placeholder="KEY" class="input-dark">
+                <button onclick="saveAccount()" class="btn-action w-full bg-amber-500 text-black font-bold py-4 mt-4">EXECUTE</button>
+                <button onclick="toggleModal('addModal', false)" class="text-[10px] opacity-30 mt-4 w-full">ABORT</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIDEO MODAL -->
+    <div id="videoModal" class="hidden fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-5xl border border-white/10 relative bg-black shadow-2xl">
+            <div class="scanner"></div>
+            <video id="videoPlayer" controls autoplay class="w-full aspect-video"></video>
+            <div class="flex justify-between p-4 bg-[#0a0a0a]">
+                <span id="camTitle" class="text-[10px] text-amber-500 font-bold tracking-widest">FEED // LIVE</span>
+                <button onclick="closeVideo()" class="text-[10px] text-white/50 hover:text-white transition-colors">[ TERMINATE_LINK ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAY MODAL -->
+    <div id="payModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-6">
+        <div class="bg-[#0a0a0a] border border-white/10 p-8 w-full max-w-sm flex flex-col relative text-center">
+            <button onclick="toggleModal('payModal', false)" class="absolute top-4 right-4 text-white/20 hover:text-red-500"><i data-lucide="x"></i></button>
+            <h2 class="text-xs font-bold tracking-[0.3em] mb-6 text-amber-500">// FUNDS_TRANSFER</h2>
+            
+            <div id="payInputStep">
+                <p class="text-[10px] text-white/40 mb-4 uppercase">Enter amount (RUB) to fund ID: <span id="payTargetId" class="text-white"></span></p>
+                <input id="inAmount" type="number" placeholder="0.00" class="w-full bg-[#000] border border-white/10 p-4 text-2xl font-bold text-center text-amber-500 outline-none focus:border-amber-500 mb-4">
+                <button id="btnPaySBP" onclick="processPayment('sbp')" class="btn-action w-full bg-amber-500 text-black font-bold py-4 hover:bg-amber-400">[ GENERATE_SBP_QR ]</button>
+            </div>
+
+            <!-- Контейнер для QR кода -->
+            <div id="qrContainer" class="hidden flex flex-col items-center mt-4">
+                <p class="text-[10px] text-emerald-500 font-bold tracking-widest mb-4 animate-pulse">AWAITING_SCAN...</p>
+                <div id="qrImage" class="p-2 border border-amber-500/30 bg-black"></div>
+                <p class="text-[8px] text-white/30 mt-4 uppercase">Scan using your banking app</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ALL_CAMERAS = [];
+
+        function toggleModal(id, show) {
+            document.getElementById(id).classList.toggle('hidden', !show);
+        }
+
+        async function switchView(view) {
+            document.getElementById('dashboardView').classList.toggle('hidden', view !== 'dashboard');
+            document.getElementById('camerasView').classList.toggle('hidden', view !== 'cameras');
+            document.getElementById('nav-dashboard').classList.toggle('active', view === 'dashboard');
+            document.getElementById('nav-cameras').classList.toggle('active', view === 'cameras');
+            if (view === 'cameras' && ALL_CAMERAS.length === 0) await loadAllCameras();
+        }
+
+        async function saveAccount() {
+            const acc = {
+                addr: document.getElementById('inAddr').value,
+                login: document.getElementById('inLogin').value,
+                password: document.getElementById('inPass').value
+            };
+            if (acc.addr && acc.login && acc.password) {
+                await window.api.addAccount(acc);
+                toggleModal('addModal', false);
+                refreshDashboard();
+            }
+        }
+
+async function removeAccount(login) {
+    const confirmed = confirm("WARNING: PURGE UNIT DATA?");
+    if (confirmed) {
+        await window.api.deleteAccount(login);
+        
+        const cardEl = document.getElementById(`card-${login}`);
+        if (cardEl) cardEl.remove();
+    }
+}
+function createCard(acc) {
+    const div = document.createElement('div');
+    div.className = 'station-card';
+    div.id = `card-${acc.login}`;
+    div.innerHTML = `
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <p class="text-[10px] text-amber-500 font-bold">${acc.addr}</p>
+                <div class="flex items-center gap-2 mt-1">
+                    <div class="w-1.5 h-1.5 rounded-full bg-white/10 status-dot"></div>
+                    <p class="status-text text-[8px] text-white/20 tracking-widest uppercase">Connecting...</p>
+                </div>
+            </div>
+            <button onclick="removeAccount('${acc.login}')" class="text-white/10 hover:text-red-500 transition-colors">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+            <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
+            <div>
+                <p class="text-[9px] text-white/20 uppercase">Remaining: <span class="days-val text-white">-- D</span></p>
+                <p class="text-[8px] text-white/10 mt-1">ID: ${acc.login}</p>
+            </div>
+            <button onclick="openPayModal('${acc.login}')" class="text-[9px] font-bold text-black bg-white/80 hover:bg-amber-500 px-3 py-1.5 transition-colors">
+                [ TOP_UP ]
+            </button>
+        </div>
+        
+        <div>
+            <p class="text-[9px] text-white/20 tracking-widest mb-1 user-name">SYNCHRONIZING</p>
+            <p class="text-5xl font-bold tracking-tighter balance-val">---</p>
+        </div>
+
+        <!-- ПАНЕЛЬ СЕТИ -->
+        <div class="mt-4 flex justify-between items-center bg-black border border-white/5 p-2 rounded">
+            <span class="text-[9px] text-white/40 tracking-widest uppercase">NET_STATUS</span>
+            <button id="net-btn-${acc.login}" onclick="toggleNetwork('${acc.login}')" class="text-[9px] font-bold px-3 py-1 bg-white/5 text-white/40 border border-transparent hover:border-white/20 transition-all cursor-wait">
+                LOADING...
+            </button>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-white/5 flex justify-between">
+            <p class="text-[9px] text-white/20 uppercase">Remaining: <span class="days-val text-white">--</span></p>
+            <p class="text-[8px] text-white/10">ID: ${acc.login}</p>
+        </div>
+    `;
+    return div;
+}
+
+        async function updateCardData(acc, card) {
+    const data = await window.api.fetchData(acc);
+    if (data && data.success) {
+        card.classList.add('online');
+        card.querySelector('.balance-val').innerText = data.balance;
+        card.querySelector('.user-name').innerText = data.name;
+        card.querySelector('.days-val').innerText = data.days + ' D';
+        card.querySelector('.status-dot').style.background = '#00ffaa';
+        card.querySelector('.status-text').innerText = 'Link Active';
+        card.querySelector('.status-text').className = 'status-text text-[8px] text-emerald-500 tracking-widest uppercase';
+        
+        // Запрашиваем статус сети
+        const netData = await window.api.getNetStatus(acc);
+        const netBtn = document.getElementById(`net-btn-${acc.login}`);
+        
+        // Кэшируем данные в кнопку для toggleNetwork
+        netBtn.dataset.acc = JSON.stringify(acc);
+        netBtn.dataset.hash = netData.hash;
+        netBtn.dataset.reqs = JSON.stringify(netData.requests);
+        netBtn.dataset.isBlocked = netData.isBlocked;
+
+        if (netData.isBlocked) {
+            netBtn.innerText = "BLOCKED";
+            netBtn.className = "text-[9px] font-bold px-3 py-1 bg-red-500/20 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-black cursor-pointer transition-all";
+        } else {
+            netBtn.innerText = "ACTIVE";
+            netBtn.className = "text-[9px] font-bold px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-red-500 hover:text-black hover:border-red-500 cursor-pointer transition-all";
+        }
+    }
+}
+async function toggleNetwork(login) {
+    const btn = document.getElementById(`net-btn-${login}`);
+    if (!btn.dataset.hash) return;
+
+    const isBlocked = btn.dataset.isBlocked === "true";
+    const acc = JSON.parse(btn.dataset.acc);
+    const hash = btn.dataset.hash;
+    const reqs = JSON.parse(btn.dataset.reqs);
+
+    if (isBlocked) {
+        // Разблокировка
+        if (confirm("UNBLOCK NETWORK CONNECTION?")) {
+            btn.innerText = "UPDATING...";
+            await window.api.unblockNet({ hash, requests: reqs });
+            
+            updateCardData(acc, document.getElementById(`card-${login}`));
+        }
+    } else {
+        // Блокировка
+        if (confirm("WARNING: DISABLE NETWORK CONNECTION FOR THIS UNIT?")) {
+            btn.innerText = "UPDATING...";
+            await window.api.blockNet(hash);
+            updateCardData(acc, document.getElementById(`card-${login}`));
+        }
+    }
+}
+        async function refreshDashboard() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            const accounts = await window.api.getAccounts();
+            accounts.forEach(acc => {
+                const card = createCard(acc);
+                grid.appendChild(card);
+                updateCardData(acc, card);
+            });
+            lucide.createIcons();
+        }
+
+        async function loadAllCameras() {
+            const grid = document.getElementById('camerasGrid');
+            grid.innerHTML = '<p class="text-[10px] opacity-20 p-4 animate-pulse">ACCESSING_DATABASE...</p>';
+            ALL_CAMERAS = await window.api.getAllCameras();
+            renderCameras(ALL_CAMERAS);
+        }
+
+        function renderCameras(cameras) {
+            const grid = document.getElementById('camerasGrid');
+            grid.innerHTML = '';
+            cameras.forEach(cam => {
+                const el = document.createElement('div');
+                el.className = 'station-card p-4 flex flex-col justify-between gap-4';
+                el.innerHTML = `
+                    <div>
+                        <p class="text-[9px] text-amber-500 font-bold">${cam.city}</p>
+                        <p class="text-[10px] text-white/40 mt-1 h-8 overflow-hidden">${cam.title}</p>
+                    </div>
+                    <button onclick="openPublicCamera('${cam.stream}', '${cam.title}')" class="btn-action w-full text-center">WATCH</button>
+                `;
+                grid.appendChild(el);
+            });
+        }
+
+        function filterCameras(query) {
+            const filtered = ALL_CAMERAS.filter(cam => 
+                cam.title.toLowerCase().includes(query.toLowerCase()) || 
+                cam.city.toLowerCase().includes(query.toLowerCase())
+            );
+            renderCameras(filtered);
+        }
+
+        async function openPublicCamera(streamId, title) {
+            const accs = await window.api.getAccounts();
+            if (accs.length === 0) { alert("ADD ACCOUNT FIRST"); return; }
+            
+            // Обновляем заголовок перед открытием
+            const titleEl = document.getElementById('camTitle');
+            if (titleEl) titleEl.innerText = `FEED // ${title}`;
+            
+            const url = await window.api.getStreamUrl({
+                login: accs[0].login, 
+                password: accs[0].password, 
+                streamId: streamId
+            });
+
+            if (url) {
+    toggleModal('videoModal', true);
+    const videoElement = document.getElementById('videoPlayer'); 
+
+    if (window.hls) {
+        window.hls.detachMedia();
+        window.hls.destroy();
+        window.hls = null;
+    }
+
+    if (Hls.isSupported()) {
+if (window.hls) window.hls.destroy();
+
+    const hls = new Hls({
+        xhrSetup: function(xhr, url) {
+            xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36');
+            xhr.setRequestHeader('X-Requested-With', 'com.powermobile.hello');
+        }
+    });
+    
+    hls.loadSource(url);
+    hls.attachMedia(videoElement);
+    window.hls = hls;
+        hls.on(Hls.Events.MANIFEST_PARSED, () => videoElement.play());
+    }
+}
+    }
+        
+        function closeVideo() {
+            toggleModal('videoModal', false);
+            const video = document.getElementById('videoPlayer');
+            video.pause();
+            video.src = "";
+            if (window.hls) {
+                window.hls.destroy();
+                window.hls = null;
+            }
+        }
+
+        refreshDashboard();
+
+        async function resetNet(login) {
+        const card = document.getElementById(`card-${login}`);
+        const btn = card.querySelector('.net-warn button');
+        const hash = btn.dataset.hash;
+        const reqs = JSON.parse(btn.dataset.reqs);
+
+        const confirmReset = confirm(`EXECUTE OVERRIDE PROTOCOL? \nThis will clear ${reqs.length} pending restrictions.`);
+        if (confirmReset) {
+        btn.innerText = "EXECUTING...";
+        const success = await window.api.resetNetStatus({ hash: hash, requests: reqs });
+        
+        if (success) {
+            card.querySelector('.net-warn').classList.add('hidden');
+            alert("OVERRIDE SUCCESSFUL. Network restrictions cleared.");
+        } else {
+            btn.innerText = "FAILED";
+            alert("SYSTEM ERROR: Cannot clear restrictions.");
+        }
+    }
+}
+let currentPayLogin = null;
+
+function openPayModal(login) {
+    currentPayLogin = login;
+    document.getElementById('payTargetId').innerText = login;
+    document.getElementById('inAmount').value = '';
+    
+    // Сбрасываем UI модалки
+    document.getElementById('payInputStep').classList.remove('hidden');
+    document.getElementById('qrContainer').classList.add('hidden');
+    document.getElementById('btnPaySBP').innerText = "[ GENERATE_SBP_QR ]";
+    
+    toggleModal('payModal', true);
+}
+async function processPayment(method) {
+    const amount = document.getElementById('inAmount').value;
+    if (!amount || Number(amount) < 10) {
+        alert("MINIMUM AMOUNT: 10 RUB");
+        return;
+    }
+
+    const btn = document.getElementById('btnPaySBP');
+    btn.innerText = "REQUESTING_GATEWAY...";
+
+    const res = await window.api.getPayLink({ login: currentPayLogin, amount: amount, method: method });
+
+    if (res.success && res.url) {
+        
+        document.getElementById('payInputStep').classList.add('hidden');
+        document.getElementById('qrContainer').classList.remove('hidden');
+        
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(res.url)}&color=ffae00&bgcolor=0a0a0a`;
+        
+        document.getElementById('qrImage').innerHTML = `<img src="${qrUrl}" alt="SBP QR" class="w-full h-full">`;
+    } else {
+        alert("TRANSACTION_FAILED: " + res.msg);
+        btn.innerText = "[ GENERATE_SBP_QR ]";
+    }
+}
+</script>
+</body>
+</html>
