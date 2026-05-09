@@ -34,14 +34,12 @@ async function getFullData(login, password) {
         const user_hash = authData.hash || authData.data?.hash;
         if (!user_hash) throw new Error("No Hash received");
 
-        // Получаем баланс
         const { data: info } = await axios.get(API_URL, { 
             params: { hash: user_hash, model: 'Inetstatus', method: 'getInetStatus', params: '{}' }, 
             headers: HEADERS,
             httpsAgent: agent
         });
 
-        // Получаем дни
         const { data: days } = await axios.get(API_URL, { 
             params: { hash: user_hash, model: 'Inetstatus', method: 'getForecastDisableUserApi', params: '{}' }, 
             headers: HEADERS,
