@@ -130,17 +130,23 @@
     <!-- === MODALS === -->
 
     <!-- Modal: Add Account -->
-    <div id="addModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-6 transition-opacity">
-        <div class="ios-card p-8 w-full max-w-sm flex flex-col gap-5 shadow-2xl relative fade-in">
-            <div class="flex justify-between items-center mb-2">
-                <h2 class="text-xl font-bold">Новый объект</h2>
-                <button onclick="toggleModal('addModal', false)" class="ios-btn w-8 h-8"><i data-lucide="x" class="w-4 h-4"></i></button>
-            </div>
-            <input id="inAddr" type="text" placeholder="Название (например, Дом)" class="ios-input">
-            <input id="inLogin" type="text" placeholder="Логин (Договор)" class="ios-input">
-            <input id="inPass" type="password" placeholder="Пароль" class="ios-input">
-            <button onclick="saveAccount()" class="ios-btn-primary py-4 mt-2">Сохранить</button>
+    <div id="addModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center">
+        <div class="ios-card p-8 w-80 flex flex-col gap-4">
+            <h2 class="font-bold">Новый объект</h2>
+            <input id="inAddr" placeholder="Название" class="bg-white/5 p-3 rounded-xl border border-white/10 outline-none">
+            <input id="inLogin" placeholder="Логин" class="bg-white/5 p-3 rounded-xl border border-white/10 outline-none">
+            <input id="inPass" type="password" placeholder="Пароль" class="bg-white/5 p-3 rounded-xl border border-white/10 outline-none">
+            <button onclick="saveAccount()" class="ios-btn-primary py-3">Сохранить</button>
+            <button onclick="toggleModal('addModal', false)" class="text-xs opacity-50">Отмена</button>
         </div>
+    </div>
+
+    <div id="videoModal" class="hidden fixed inset-0 bg-black z-50 flex flex-col">
+        <div class="flex justify-between p-6">
+            <span id="camTitle" class="font-bold text-[#fcc300]">LIVE_FEED</span>
+            <button onclick="closeVideo()" class="ios-btn px-4 py-2 bg-red-500/20 text-red-500">ЗАКРЫТЬ</button>
+        </div>
+        <video id="videoPlayer" controls autoplay class="flex-grow w-full"></video>
     </div>
 
     <!-- Modal: Pay SBP -->
@@ -413,41 +419,39 @@
         let chatSocket = null; let activeRoom = null; let activeLogin = null;
 
         async function initChat() {
-            if (chatSocket) return;
-            const accounts = await window.api.getAccounts();
-            if (accounts.length === 0) return updateChatStatus('gray', 'Нет аккаунтов');
+            if(chatSocket) return;
+            const accs = await window.api.getAccounts();
+            if(accs.length === 0) return;
+            const login = accs[0].login.includes('user') ? accs[0].login : 'user'+accs[0].login;
+            const room = 'secret' + login;
 
-            const acc = accounts[0];
-            activeLogin = acc.login.includes("user") ? acc.login : `user${acc.login}`;
-            activeRoom = `secret${activeLogin}`;
-
-            updateChatStatus('yellow', 'Соединение...');
+            chatSocket = io("https://chat.powernet.com.ru", { transports: ['websocket'] });
             
-            chatSocket = io("wss://chat.powernet.com.ru", { transports: ['websocket'], rejectUnauthorized: false });
-
-            chatSocket.on("connect", () => {
-                updateChatStatus('#30D158', 'В сети');
-                chatSocket.emit("auth", { login: activeLogin, name: acc.addr });
-                chatSocket.emit("checkCount", { room: activeRoom, uuid: "ios-station", login: activeLogin });
-                chatSocket.emit("getMessages", { room: activeRoom });
-                setTimeout(() => chatSocket.emit("roomid", { roomid: activeRoom, login: activeLogin }), 1000);
+            chatSocket.on('connect', () => {
+                chatSocket.emit('auth', { login: login, name: accs[0].addr });
+                chatSocket.emit('roomid', { roomid: room, login: login });
+                chatSocket.emit('getMessages', { room: room });
             });
 
-            chatSocket.on("getMessages", (data) => {
-                document.getElementById('chatMessages').innerHTML = '';
-                if (data.chat) data.chat.forEach(msg => appendMessage(msg));
-                scrollToBottom();
+            chatSocket.on('getMessages', (d) => {
+                const container = document.getElementById('chatMessages');
+                container.innerHTML = '';
+                if(d.chat) d.chat.forEach(m => {
+                    const msgEl = document.createElement('div');
+                    const isOut = m.username === login || !m.operator_name;
+                    msgEl.className = `msg-bubble ${isOut ? 'msg-out' : 'msg-in'}`;
+                    msgEl.innerText = m.message;
+                    container.appendChild(msgEl);
+                });
+                container.scrollTop = container.scrollHeight;
             });
 
-            chatSocket.on(`add_mess_${activeRoom}`, (msg) => {
-                appendMessage(msg); scrollToBottom();
-                // Уведомление в фоне
-                if(document.getElementById('chatView').classList.contains('hidden')) {
-                    document.getElementById('chatBadge').classList.remove('hidden');
-                }
+            chatSocket.on('add_mess_' + room, (m) => {
+                const msgEl = document.createElement('div');
+                msgEl.className = `msg-bubble msg-in`;
+                msgEl.innerText = m.message;
+                document.getElementById('chatMessages').appendChild(msgEl);
             });
-
-            chatSocket.on("disconnect", () => updateChatStatus('red', 'Отключено'));
         }
 
         function appendMessage(msg) {
