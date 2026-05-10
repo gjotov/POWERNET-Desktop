@@ -2,197 +2,213 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Smart Home OS</title>
+    <title>Powernet Station OS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Подключаем Socket.IO для чата -->
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@2.3.0/dist/socket.io.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
-        :root { --accent: #fcc300; }
+        :root { --accent: #fcc300; --accent-hover: #ffcf33; --bg: #000000; --card: rgba(28, 28, 30, 0.4); }
 
-        body { font-family: 'Inter', sans-serif; background-color: #000000; color: #ffffff; -webkit-user-select: none; margin: 0; overflow-x: hidden; display: flex; flex-direction: column; min-height: 100vh; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: #ffffff; -webkit-user-select: none; margin: 0; overflow-x: hidden; display: flex; flex-direction: column; min-height: 100vh; }
 
-        /* Ambient Glow */
-        .ambient-glow-1 { position: fixed; top: -10%; left: -5%; width: 40%; height: 40%; background: rgba(252, 195, 0, 0.08); filter: blur(120px); border-radius: 50%; pointer-events: none; z-index: -1; }
-        .ambient-glow-2 { position: fixed; bottom: -10%; right: -5%; width: 30%; height: 30%; background: rgba(252, 195, 0, 0.05); filter: blur(100px); border-radius: 50%; pointer-events: none; z-index: -1; }
+        /* ВАУ-ФОН: Анимированный Mesh Gradient + Шум (Apple Style) */
+        .ambient-bg {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2;
+            background: 
+                radial-gradient(circle at 15% 50%, rgba(252, 195, 0, 0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 255, 170, 0.03), transparent 25%),
+                radial-gradient(circle at 50% 80%, rgba(0, 122, 255, 0.04), transparent 30%);
+            animation: breathe 15s ease-in-out infinite alternate;
+        }
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events: none;
+        }
+        @keyframes breathe { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
 
         /* Cards & Glass */
-        .ios-card { background: rgba(28, 28, 30, 0.5); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 32px; transition: all 0.3s; }
-        .ios-card:hover { transform: translateY(-4px); background: rgba(35, 35, 38, 0.7); border-color: rgba(252, 195, 0, 0.2); }
+        .ios-card { background: var(--card); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 32px; transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        .ios-card:hover { transform: translateY(-4px); background: rgba(44, 44, 46, 0.5); border-color: rgba(252, 195, 0, 0.2); box-shadow: 0 30px 60px rgba(252, 195, 0, 0.08); }
 
         /* Buttons */
-        .ios-btn { background: rgba(255, 255, 255, 0.08); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; cursor: pointer; border: none; color: white; }
-        .ios-btn:hover { background: rgba(255, 255, 255, 0.15); }
+        .ios-btn { background: rgba(255, 255, 255, 0.06); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; cursor: pointer; border: none; color: white; }
+        .ios-btn:hover { background: rgba(255, 255, 255, 0.15); transform: scale(1.05); }
         .ios-btn:active { transform: scale(0.95); }
-        .ios-btn-primary { background: var(--accent); color: #000; border-radius: 999px; font-weight: 700; transition: all 0.2s; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; }
-        .ios-btn-primary:hover { background: #ffcf33; transform: scale(1.02); }
+        .ios-btn-primary { background: var(--accent); color: #000; border-radius: 999px; font-weight: 700; transition: all 0.2s; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(252, 195, 0, 0.2); }
+        .ios-btn-primary:hover { background: var(--accent-hover); transform: scale(1.02); box-shadow: 0 12px 25px rgba(252, 195, 0, 0.3); }
         .ios-btn-primary:active { transform: scale(0.95); }
 
         /* Segmented Control */
-        .segmented-control { background: rgba(28, 28, 30, 0.8); border-radius: 999px; padding: 4px; display: inline-flex; gap: 2px; }
-        .segment { padding: 8px 24px; border-radius: 999px; font-size: 14px; font-weight: 600; color: #8E8E93; transition: all 0.3s; cursor: pointer; }
-        .segment.active { background: rgba(255, 255, 255, 0.1); color: var(--accent); }
+        .segmented-control { background: rgba(255, 255, 255, 0.05); border-radius: 999px; padding: 4px; display: inline-flex; gap: 4px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); }
+        .segment { padding: 10px 24px; border-radius: 999px; font-size: 14px; font-weight: 600; color: #8E8E93; transition: all 0.4s; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .segment.active { background: rgba(255, 255, 255, 0.15); color: var(--accent); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
 
         /* Inputs */
-        .ios-input { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 16px; color: white; outline: none; transition: 0.2s; font-size: 15px; width: 100%; }
-        .ios-input:focus { border-color: var(--accent); background: rgba(255, 255, 255, 0.08); box-shadow: 0 0 0 4px rgba(252, 195, 0, 0.1); }
+        .ios-input { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; padding: 18px 24px; color: white; outline: none; transition: 0.3s; font-size: 15px; width: 100%; }
+        .ios-input:focus { border-color: var(--accent); background: rgba(255, 255, 255, 0.06); box-shadow: 0 0 0 4px rgba(252, 195, 0, 0.1); }
+
+        /* Dynamic Island */
+        #dynamic-island { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 999px; padding: 12px 24px 12px 16px; display: flex; align-items: center; gap: 12px; z-index: 9999; transition: top 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        #dynamic-island.show { top: 30px; }
+        .island-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+        /* Скелетоны */
+        .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.02) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 12px; }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
         /* Chat Styles */
         #chatMessages::-webkit-scrollbar { width: 4px; }
         #chatMessages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .msg-bubble { max-width: 80%; padding: 10px 14px; border-radius: 20px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
-        .msg-out { background: var(--accent); color: black; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .msg-in { background: rgba(255,255,255,0.1); color: white; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .msg-bubble { max-width: 75%; padding: 12px 16px; border-radius: 20px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .msg-out { background: var(--accent); color: black; align-self: flex-end; border-bottom-right-radius: 6px; box-shadow: 0 5px 15px rgba(252, 195, 0, 0.15); }
+        .msg-in { background: rgba(255,255,255,0.1); color: white; align-self: flex-start; border-bottom-left-radius: 6px; }
         .msg-sys { background: rgba(255,255,255,0.05); color: #8E8E93; align-self: center; text-align: center; font-size: 11px; padding: 6px 12px; border-radius: 999px; }
         .msg-author { font-size: 10px; opacity: 0.5; margin-bottom: 4px; margin-left: 8px; }
         .msg-time { font-size: 9px; opacity: 0.5; margin-top: 4px; text-align: right; }
 
-        /* Utils */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .fade-in { animation: fadeIn 0.4s ease forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Плавные переходы видов */
+        .view-section { transition: opacity 0.4s ease, transform 0.4s ease; opacity: 1; transform: translateY(0); display: block; }
+        .view-section.hidden-view { opacity: 0; transform: translateY(15px); pointer-events: none; position: absolute; visibility: hidden; }
+
+        ::-webkit-scrollbar { width: 0; }
     </style>
 </head>
-<body class="p-10">
+<body class="p-10 min-h-screen">
+    
+    <div class="fixed inset-0 z-[-2] bg-black"></div>
+    
+    <div class="fixed top-[-10%] left-[-10%] w-[60%] h-[60%] bg-[#fcc300]/10 blur-[120px] rounded-full animate-pulse pointer-events-none z-[-1]"></div>
+    <div class="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full pointer-events-none z-[-1]"></div>
+    
+    <div class="fixed inset-0 z-[-1] opacity-[0.03] pointer-events-none" style="background-image: url('https://grainy-gradients.vercel.app/noise.svg'); filter: contrast(150%) brightness(100%);"></div>
 
-    <div class="ambient-glow-1"></div>
-    <div class="ambient-glow-2"></div>
+    <div id="dynamic-island">
+        <div id="di-icon" class="island-icon bg-[#fcc300] text-black"><i data-lucide="bell" class="w-4 h-4"></i></div>
+        <span id="di-text" class="text-sm font-semibold tracking-tight text-white">Уведомление</span>
+    </div>
 
     <!-- HEADER -->
-    <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 fade-in">
+    <header class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-10 gap-8">
         <div>
-            <h1 class="text-3xl font-bold tracking-tight mb-4">Мой Дом</h1>
+            <h1 class="text-4xl font-extrabold tracking-tight mb-6 flex items-center gap-3">
+                Powernet <span class="bg-[#fcc300] text-black text-[11px] px-2.5 py-1 rounded-md font-black tracking-widest uppercase">OS 2.0</span>
+            </h1>
             <div class="segmented-control">
-                <div id="nav-dashboard" onclick="switchView('dashboard')" class="segment active">Объекты</div>
-                <div id="nav-cameras" onclick="switchView('cameras')" class="segment">Все камеры</div>
-                <div id="nav-chat" onclick="switchView('chat')" class="segment flex items-center gap-2">
-                    Поддержка <div id="chatBadge" class="hidden w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_red]"></div>
+                <div id="nav-dashboard" onclick="switchView('dashboard')" class="segment active"><i data-lucide="layout-grid" class="w-4 h-4"></i> Объекты</div>
+                <div id="nav-cameras" onclick="switchView('cameras')" class="segment"><i data-lucide="cctv" class="w-4 h-4"></i> Камеры</div>
+                <div id="nav-chat" onclick="switchView('chat')" class="segment relative">
+                    <i data-lucide="headphones" class="w-4 h-4"></i> Поддержка
+                    <div id="chatBadge" class="hidden absolute top-1 right-2 w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_red]"></div>
                 </div>
             </div>
         </div>
-        <button onclick="toggleModal('addModal', true)" class="ios-btn px-5 py-3 gap-2 font-semibold">
+        <button onclick="toggleModal('addModal', true)" class="ios-btn px-6 py-4 gap-3 font-semibold text-sm bg-white/5 hover:bg-white/10">
             <i data-lucide="plus" class="w-5 h-5"></i> Добавить объект
         </button>
     </header>
 
-    <!-- VIEWS -->
-    
-    <!-- 1. DASHBOARD -->
-    <div id="dashboardView" class="fade-in flex-grow">
-        <div id="grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
-    </div>
-    
-    <!-- 2. CAMERAS MAP -->
-    <div id="camerasView" class="hidden fade-in flex-grow">
-        <div class="relative mb-8 max-w-md">
-            <i data-lucide="search" class="absolute left-4 top-4 w-5 h-5 text-gray-400"></i>
-            <input onkeyup="filterCameras(this.value)" placeholder="Поиск камеры..." class="ios-input pl-12 rounded-full">
+    <!-- MAIN CONTENT AREA -->
+    <div class="relative flex-grow">
+        
+        <!-- DASHBOARD -->
+        <div id="dashboardView" class="view-section">
+            <div id="grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
         </div>
-        <div id="camerasGrid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
-    </div>
+        
+        <!-- CAMERAS -->
+        <div id="camerasView" class="view-section hidden-view">
+            <div class="relative mb-8 max-w-lg">
+                <i data-lucide="search" class="absolute left-6 top-5 w-5 h-5 text-gray-400"></i>
+                <input onkeyup="filterCameras(this.value)" placeholder="Найти камеру (двор, парковка, адрес)..." class="ios-input pl-16 rounded-full bg-white/5 border-white/5">
+            </div>
+            <div id="camerasGrid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5"></div>
+        </div>
 
-    <!-- 3. CHAT -->
-    <div id="chatView" class="hidden fade-in flex-grow flex-col h-[calc(100vh-200px)]">
-        <div class="ios-card flex-grow flex flex-col overflow-hidden relative shadow-2xl">
-            <!-- Шапка чата -->
-            <div class="p-4 bg-white/5 border-b border-white/10 flex justify-between items-center z-10">
-                <div class="flex items-center gap-3">
-                    <div class="bg-blue-500/20 p-2 rounded-full text-blue-500">
-                        <i data-lucide="headphones" class="w-5 h-5"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-sm">Служба поддержки</h3>
-                        <div class="flex items-center gap-1.5 mt-0.5">
-                            <div id="chatStatusDot" class="w-1.5 h-1.5 rounded-full bg-gray-500"></div>
-                            <span id="chatStatusText" class="text-[10px] text-gray-400 font-medium">Ожидание...</span>
+        <!-- CHAT -->
+        <div id="chatView" class="view-section hidden-view h-[calc(100vh-220px)]">
+            <div class="ios-card h-full flex flex-col overflow-hidden relative shadow-2xl max-w-4xl mx-auto">
+                <div class="p-6 bg-white/5 border-b border-white/5 flex justify-between items-center z-10">
+                    <div class="flex items-center gap-4">
+                        <div class="bg-[#fcc300]/20 p-3 rounded-full text-[#fcc300]"><i data-lucide="message-square" class="w-6 h-6"></i></div>
+                        <div>
+                            <h3 class="font-bold text-lg">Служба поддержки</h3>
+                            <div class="flex items-center gap-2 mt-1">
+                                <div id="chatStatusDot" class="w-2 h-2 rounded-full bg-gray-500 transition-colors"></div>
+                                <span id="chatStatusText" class="text-xs text-gray-400 font-medium">Ожидание...</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Зона сообщений -->
-            <div id="chatMessages" class="flex-grow p-6 overflow-y-auto flex flex-col gap-4"></div>
-
-            <!-- Ввод сообщения -->
-            <div class="p-4 bg-white/5 border-t border-white/10 flex gap-3 z-10 items-end">
-                <textarea id="chatInput" rows="1" placeholder="Напишите сообщение..." class="ios-input py-3 px-4 resize-none" oninput="this.style.height = '';this.style.height = this.scrollHeight + 'px'" onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }"></textarea>
-                <button onclick="sendChatMessage()" class="ios-btn-primary w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center">
-                    <i data-lucide="send" class="w-5 h-5"></i>
-                </button>
+                <div id="chatMessages" class="flex-grow p-8 overflow-y-auto flex flex-col gap-6"></div>
+                <div class="p-6 bg-white/5 border-t border-white/5 flex gap-4 items-end z-10">
+                    <textarea id="chatInput" rows="1" placeholder="Ваше сообщение..." class="ios-input py-4 px-6 resize-none rounded-3xl" oninput="this.style.height = '';this.style.height = Math.min(this.scrollHeight, 150) + 'px'" onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }"></textarea>
+                    <button onclick="sendChatMessage()" class="ios-btn-primary w-14 h-14 rounded-full flex-shrink-0"><i data-lucide="send" class="w-6 h-6"></i></button>
+                </div>
             </div>
         </div>
+
     </div>
 
     <!-- === MODALS === -->
-
-    <!-- Modal: Add Account -->
-    <div id="addModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center">
-        <div class="ios-card p-8 w-80 flex flex-col gap-4">
-            <h2 class="font-bold">Новый объект</h2>
-            <input id="inAddr" placeholder="Название" class="bg-white/5 p-3 rounded-xl border border-white/10 outline-none">
-            <input id="inLogin" placeholder="Логин" class="bg-white/5 p-3 rounded-xl border border-white/10 outline-none">
-            <input id="inPass" type="password" placeholder="Пароль" class="bg-white/5 p-3 rounded-xl border border-white/10 outline-none">
-            <button onclick="saveAccount()" class="ios-btn-primary py-3">Сохранить</button>
-            <button onclick="toggleModal('addModal', false)" class="text-xs opacity-50">Отмена</button>
+    
+    <!-- Add Modal -->
+    <div id="addModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 transition-all duration-300 opacity-0">
+        <div class="ios-card p-10 w-full max-w-md flex flex-col gap-6 transform scale-95 transition-transform duration-300 modal-content">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-2xl font-bold">Новый объект</h2>
+                <button onclick="toggleModal('addModal', false)" class="ios-btn w-10 h-10"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <input id="inAddr" type="text" placeholder="Название (например, Дом)" class="ios-input">
+            <input id="inLogin" type="text" placeholder="Договор (userXXXXX)" class="ios-input">
+            <input id="inPass" type="password" placeholder="Пароль" class="ios-input">
+            <button onclick="saveAccount()" class="ios-btn-primary py-5 mt-4 text-lg">Синхронизировать</button>
         </div>
     </div>
 
-    <div id="videoModal" class="hidden fixed inset-0 bg-black z-50 flex flex-col">
-        <div class="flex justify-between p-6">
-            <span id="camTitle" class="font-bold text-[#fcc300]">LIVE_FEED</span>
-            <button onclick="closeVideo()" class="ios-btn px-4 py-2 bg-red-500/20 text-red-500">ЗАКРЫТЬ</button>
-        </div>
-        <video id="videoPlayer" controls autoplay class="flex-grow w-full"></video>
-    </div>
-
-    <!-- Modal: Pay SBP -->
-    <div id="payModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-6">
-        <div class="ios-card p-8 w-full max-w-sm flex flex-col items-center relative fade-in">
-            <button onclick="toggleModal('payModal', false)" class="absolute top-4 right-4 ios-btn w-8 h-8"><i data-lucide="x" class="w-4 h-4"></i></button>
-            
+    <!-- Pay Modal -->
+    <div id="payModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 transition-all duration-300 opacity-0">
+        <div class="ios-card p-10 w-full max-w-md flex flex-col items-center relative modal-content transform scale-95 transition-transform duration-300">
+            <button onclick="toggleModal('payModal', false)" class="absolute top-6 right-6 ios-btn w-10 h-10"><i data-lucide="x" class="w-5 h-5"></i></button>
             <div id="payInputStep" class="w-full text-center mt-4">
-                <div class="bg-[#fcc300]/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-[#fcc300]">
-                    <i data-lucide="wallet" class="w-8 h-8"></i>
-                </div>
-                <h2 class="text-xl font-bold mb-1">Пополнение</h2>
-                <p class="text-sm text-gray-400 mb-6">Договор: <span id="payTargetId" class="text-white font-medium"></span></p>
-                <input id="inAmount" type="number" placeholder="0" class="ios-input w-full text-center text-3xl font-bold py-6 mb-6">
-                <button id="btnPaySBP" onclick="processPayment('sbp')" class="ios-btn-primary w-full py-4 text-base">Оплатить по СБП</button>
+                <div class="bg-[#fcc300]/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-[#fcc300]"><i data-lucide="wallet" class="w-10 h-10"></i></div>
+                <h2 class="text-2xl font-bold mb-2">Пополнение баланса</h2>
+                <p class="text-sm text-gray-400 mb-8">Договор: <span id="payTargetId" class="text-white font-semibold"></span></p>
+                <input id="inAmount" type="number" placeholder="0" class="ios-input w-full text-center text-4xl font-bold py-6 mb-8 bg-black/50">
+                <button id="btnPaySBP" onclick="processPayment('sbp')" class="ios-btn-primary w-full py-5 text-lg">Оплатить по СБП</button>
             </div>
-
             <div id="qrContainer" class="hidden flex flex-col items-center w-full mt-2">
-                <h2 class="text-lg font-bold mb-6">Отсканируйте код</h2>
-                <div id="qrImage" class="bg-white p-4 rounded-3xl w-48 h-48 mb-6 shadow-xl flex items-center justify-center">
-                    <i data-lucide="loader" class="w-8 h-8 text-gray-400 animate-spin"></i>
-                </div>
-                <p class="text-sm text-gray-400 text-center">Откройте приложение банка и отсканируйте QR-код для оплаты</p>
+                <h2 class="text-xl font-bold mb-8">Отсканируйте код</h2>
+                <div id="qrImage" class="bg-white p-5 rounded-[2rem] w-56 h-56 mb-8 shadow-2xl flex items-center justify-center"><i data-lucide="loader" class="w-10 h-10 text-gray-400 animate-spin"></i></div>
+                <p class="text-sm text-gray-400 text-center leading-relaxed">Откройте приложение вашего банка и отсканируйте QR-код для мгновенной оплаты</p>
             </div>
         </div>
     </div>
 
-    <!-- Modal: History/Stats -->
-    <div id="statsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-6">
-        <div class="ios-card p-8 w-full max-w-md flex flex-col relative max-h-[80vh] fade-in">
-            <button onclick="toggleModal('statsModal', false)" class="absolute top-4 right-4 ios-btn w-8 h-8"><i data-lucide="x" class="w-4 h-4"></i></button>
-            <h2 class="text-xl font-bold mb-6 text-[#fcc300]">История платежей</h2>
-            <div id="statsList" class="overflow-y-auto pr-2 flex flex-col gap-3"></div>
+    <!-- Stats Modal -->
+    <div id="statsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 transition-all duration-300 opacity-0">
+        <div class="ios-card p-8 w-full max-w-lg flex flex-col relative max-h-[85vh] modal-content transform scale-95 transition-transform duration-300">
+            <div class="flex justify-between items-center mb-8 border-b border-white/5 pb-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-3"><i data-lucide="receipt" class="text-[#fcc300]"></i> История</h2>
+                <button onclick="toggleModal('statsModal', false)" class="ios-btn w-10 h-10"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="statsList" class="overflow-y-auto pr-4 flex flex-col gap-3 pb-4"></div>
         </div>
     </div>
 
-    <!-- Modal: Video Player -->
-    <div id="videoModal" class="hidden fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-6">
-        <div class="w-full max-w-5xl ios-card overflow-hidden shadow-2xl fade-in relative flex flex-col">
+    <!-- Video Modal -->
+    <div id="videoModal" class="hidden fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 transition-opacity duration-300 opacity-0">
+        <div class="w-full max-w-6xl ios-card overflow-hidden shadow-2xl relative flex flex-col modal-content transform scale-95 transition-transform duration-300">
             <video id="videoPlayer" controls autoplay class="w-full aspect-video bg-black rounded-t-[32px]"></video>
             <div class="p-6 bg-[#18181A] flex justify-between items-center rounded-b-[32px] border-t border-white/5">
-                <div class="flex items-center gap-3">
-                    <div class="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
-                    <span id="camTitle" class="font-semibold text-lg text-gray-200">Прямой эфир</span>
+                <div class="flex items-center gap-4">
+                    <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_red]"></div>
+                    <span id="camTitle" class="font-bold text-lg text-white">Прямой эфир</span>
                 </div>
-                <button onclick="closeVideo()" class="ios-btn px-6 py-2.5 text-sm font-semibold hover:bg-red-500 hover:text-white transition-colors">Закрыть</button>
+                <button onclick="closeVideo()" class="ios-btn px-8 py-3 text-sm font-semibold hover:bg-red-500 hover:text-white transition-colors bg-white/5">Закрыть трансляцию</button>
             </div>
         </div>
     </div>
@@ -202,33 +218,158 @@
         let ALL_CAMERAS = [];
         let currentPayLogin = null;
 
-        // UI Utils
+        function notify(text, type = 'info') {
+            const di = document.getElementById('dynamic-island');
+            document.getElementById('di-text').innerText = text;
+            const icon = document.getElementById('di-icon');
+            
+            icon.innerHTML = type === 'error' ? '<i data-lucide="alert-circle" class="w-4 h-4"></i>' : 
+                             type === 'success' ? '<i data-lucide="check" class="w-4 h-4"></i>' : '<i data-lucide="info" class="w-4 h-4"></i>';
+            icon.style.background = type === 'error' ? '#FF453A' : '#fcc300';
+            icon.style.color = type === 'error' ? 'white' : 'black';
+            lucide.createIcons();
+
+            di.classList.add('show');
+            setTimeout(() => di.classList.remove('show'), 3500);
+        }
+
         function toggleModal(id, show) {
             const el = document.getElementById(id);
-            if (show) { el.classList.remove('hidden'); el.style.opacity = 0; setTimeout(() => el.style.opacity = 1, 10); } 
-            else { el.style.opacity = 0; setTimeout(() => el.classList.add('hidden'), 200); }
+            const content = el.querySelector('.modal-content');
+            if (show) { 
+                el.classList.remove('hidden'); 
+                setTimeout(() => { el.style.opacity = 1; if(content) content.style.transform = 'scale(1)'; }, 10); 
+            } else { 
+                el.style.opacity = 0; if(content) content.style.transform = 'scale(0.95)';
+                setTimeout(() => el.classList.add('hidden'), 300); 
+            }
         }
 
         async function switchView(view) {
-            document.getElementById('dashboardView').classList.toggle('hidden', view !== 'dashboard');
-            document.getElementById('camerasView').classList.toggle('hidden', view !== 'cameras');
-            document.getElementById('chatView').classList.toggle('hidden', view !== 'chat');
-            
+            ['dashboard', 'cameras', 'chat'].forEach(v => {
+                const el = document.getElementById(`${v}View`);
+                if (v === view) {
+                    el.classList.remove('hidden-view');
+                    setTimeout(() => el.style.opacity = 1, 50);
+                } else {
+                    el.style.opacity = 0;
+                    el.classList.add('hidden-view');
+                }
+            });
+
             document.querySelectorAll('.segment').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`nav-${view}`).classList.add('active');
             
             if (view === 'cameras' && ALL_CAMERAS.length === 0) await loadAllCameras();
-            if (view === 'chat') {
-                document.getElementById('chatBadge').classList.add('hidden');
-                if (!chatSocket) initChat();
+            if (view === 'chat') { document.getElementById('chatBadge').classList.add('hidden'); if (!chatSocket) initChat(); }
+        }
+
+        function getSkeletonCard() {
+            return `
+                <div class="ios-card p-8 flex flex-col justify-between h-[280px]">
+                    <div class="flex items-center gap-4"><div class="w-12 h-12 rounded-full shimmer"></div><div class="w-32 h-6 shimmer"></div></div>
+                    <div class="w-48 h-12 shimmer mb-4"></div>
+                    <div class="w-full h-16 shimmer rounded-2xl"></div>
+                </div>`;
+        }
+
+function createCard(acc) {
+            const div = document.createElement('div');
+            div.className = 'ios-card p-7 flex flex-col justify-between h-full min-h-[320px] relative fade-in';
+            div.id = `card-${acc.login}`;
+            div.innerHTML = `
+                <!-- ВЕРХНЯЯ ЧАСТЬ: ИНФО -->
+                <div class="flex justify-between items-start">
+                    <div class="flex items-center gap-4">
+                        <div class="bg-[#fcc300]/15 p-3.5 rounded-[20px] text-[#fcc300]">
+                            <i data-lucide="home" class="w-6 h-6"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <h3 class="font-bold text-lg leading-tight text-white">${acc.addr}</h3>
+                            <p class="text-[11px] font-medium text-gray-500 mt-1 user-name uppercase tracking-wider">СИНХРОНИЗАЦИЯ</p>
+                        </div>
+                    </div>
+                    <div class="status-dot w-2.5 h-2.5 rounded-full bg-gray-700 mt-2"></div>
+                </div>
+                
+                <!-- ЦЕНТРАЛЬНАЯ ЧАСТЬ: БАЛАНС И ДНИ -->
+                <div class="flex flex-col gap-1">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Текущий баланс</p>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-5xl font-black tracking-tighter text-white balance-val">--</span>
+                        <span class="text-2xl font-bold text-[#fcc300]">₽</span>
+                    </div>
+                    
+                    <!-- ДНИ КАК БЭЙДЖ -->
+                    <div class="inline-flex items-center gap-2 mt-3 bg-white/5 border border-white/5 w-fit px-3 py-1.5 rounded-full">
+                        <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-gray-500"></i>
+                        <span class="text-[11px] font-bold text-gray-300"><span class="days-val">--</span> дней осталось</span>
+                    </div>
+                </div>
+
+                <!-- КНОПКА КРЕДИТА (ВСПЛЫВАЮЩАЯ) -->
+                <div id="credit-${acc.login}" class="hidden absolute top-[50%] left-0 right-0 px-7 z-10">
+                    <div class="bg-[#fcc300] p-3 rounded-2xl flex justify-between items-center shadow-2xl shadow-[#fcc300]/20">
+                        <span class="text-[11px] text-black font-black uppercase ml-2">Доступен кредит</span>
+                        <button onclick="takeCredit('${acc.login}')" class="bg-black text-white px-4 py-2 rounded-xl text-[10px] font-bold">ВЗЯТЬ</button>
+                    </div>
+                </div>
+
+                <!-- НИЖНЯЯ ЧАСТЬ: ДЕЙСТВИЯ (ACTION BAR) -->
+                <div class="flex justify-between items-center bg-black/30 p-2 rounded-[24px] border border-white/5">
+                    <button onclick="openStats('${acc.login}')" class="ios-btn w-11 h-11 hover:bg-white/10" title="История">
+                        <i data-lucide="receipt" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="openPublicCamera('${acc.login}', 'Камера: ${acc.addr}')" class="ios-btn w-11 h-11 hover:bg-white/10">
+                        <i data-lucide="video" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="openPayModal('${acc.login}')" class="ios-btn w-11 h-11 bg-white/5 hover:bg-[#fcc300] hover:text-black">
+                        <i data-lucide="credit-card" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="removeAccount('${acc.login}')" class="ios-btn w-11 h-11 hover:bg-red-500/20 hover:text-red-500">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            `;
+            return div;
+        }
+
+        async function updateCardData(acc, card) {
+            const data = await window.api.fetchData(acc);
+            if (data && data.success) {
+                const oldBal = card.querySelector('.balance-val').innerText;
+                if (oldBal !== '--' && oldBal !== data.balance) notify(`Баланс "${acc.addr}" обновлен: ${data.balance} ₽`, 'success');
+
+                card.querySelector('.balance-val').innerText = data.balance;
+                card.querySelector('.user-name').innerText = data.name;
+                card.querySelector('.days-val').innerText = data.days;
+                card.querySelector('.status-dot').className = 'status-dot w-2.5 h-2.5 rounded-full bg-[#30D158] shadow-[0_0_10px_#30D158]';
+
+                const creditData = await window.api.getCredit(acc);
+                const credBlock = document.getElementById(`credit-${acc.login}`);
+                if (creditData.success) {
+                    if (creditData.isActive) {
+                        credBlock.classList.remove('hidden'); credBlock.className = "mb-6 p-4 bg-white/5 border border-white/5 rounded-2xl flex items-center";
+                        credBlock.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-gray-400 mr-2"></i><span class="text-sm text-gray-400 font-medium">Обещанный платеж активен</span>`;
+                        lucide.createIcons({portal: credBlock});
+                    } else if (parseFloat(data.balance) < 50) {
+                        credBlock.classList.remove('hidden');
+                        credBlock.querySelector('button').dataset.days = creditData.daysLimit; credBlock.querySelector('button').dataset.pass = acc.password;
+                    }
+                }
+            } else {
+                card.querySelector('.user-name').innerText = 'Ошибка авторизации';
+                card.querySelector('.status-dot').className = 'status-dot w-2.5 h-2.5 rounded-full bg-[#FF453A] shadow-[0_0_10px_#FF453A]';
             }
         }
 
-        // Dashboard Logic
         async function refreshDashboard() {
             const grid = document.getElementById('grid');
-            grid.innerHTML = '';
+            grid.innerHTML = getSkeletonCard().repeat(3); // Скелетоны
             const accounts = await window.api.getAccounts();
+            if (accounts.length === 0) return grid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-20">Нажмите "Добавить объект" чтобы начать</div>';
+            
+            grid.innerHTML = '';
             accounts.forEach(acc => {
                 const card = createCard(acc);
                 grid.appendChild(card);
@@ -242,119 +383,49 @@
             if (acc.addr && acc.login && acc.password) {
                 await window.api.addAccount(acc);
                 toggleModal('addModal', false);
-                document.getElementById('inAddr').value = ''; document.getElementById('inLogin').value = ''; document.getElementById('inPass').value = '';
+                notify('Объект успешно добавлен', 'success');
                 refreshDashboard();
-            }
+            } else { notify('Заполните все поля', 'error'); }
         }
 
         async function removeAccount(login) {
-            if (confirm("Удалить этот объект из системы?")) {
+            // Создаем свой кастомный confirm (для скорости пока оставим браузерный, но завернем в красивый тост)
+            if (confirm("Вы уверены, что хотите удалить объект?")) {
                 await window.api.deleteAccount(login);
                 const cardEl = document.getElementById(`card-${login}`);
                 if (cardEl) { cardEl.style.transform = 'scale(0.9)'; cardEl.style.opacity = 0; setTimeout(() => cardEl.remove(), 300); }
-            }
-        }
-
-        function createCard(acc) {
-            const div = document.createElement('div');
-            div.className = 'ios-card p-6 flex flex-col justify-between h-full min-h-[260px] relative fade-in';
-            div.id = `card-${acc.login}`;
-            div.innerHTML = `
-                <div>
-                    <div class="flex justify-between items-center mb-6">
-                        <div class="flex items-center gap-3">
-                            <div class="bg-[#fcc300]/15 p-2.5 rounded-full text-[#fcc300]"><i data-lucide="home" class="w-5 h-5"></i></div>
-                            <div>
-                                <h3 class="font-semibold text-lg leading-tight text-white">${acc.addr}</h3>
-                                <p class="text-[11px] font-medium text-gray-400 mt-0.5 user-name">Синхронизация...</p>
-                            </div>
-                        </div>
-                        <div class="status-dot w-2 h-2 rounded-full bg-gray-600"></div>
-                    </div>
-                    <div class="mb-4">
-                        <p class="text-xs text-gray-400 mb-1 font-medium">Баланс</p>
-                        <div class="flex items-baseline gap-1">
-                            <span class="text-4xl font-bold tracking-tight text-white balance-val">--</span>
-                            <span class="text-lg font-semibold text-gray-400">₽</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="credit-${acc.login}" class="hidden mb-4 p-3 bg-[#fcc300]/10 border border-[#fcc300]/20 rounded-xl flex justify-between items-center">
-                    <span class="text-xs text-[#fcc300] font-semibold">Доступен кредит</span>
-                    <button onclick="takeCredit('${acc.login}')" class="bg-[#fcc300] text-black px-3 py-1 rounded-full text-[10px] font-bold hover:scale-105 transition-transform">ВЗЯТЬ</button>
-                </div>
-
-                <div class="mt-auto bg-white/5 p-4 rounded-2xl flex justify-between items-center">
-                    <div><p class="text-[10px] text-gray-400 mb-0.5 font-medium uppercase tracking-wider">Оплачено на</p><p class="text-sm font-semibold text-white days-val">-- дн.</p></div>
-                    <div class="flex gap-2">
-                        <button onclick="openStats('${acc.login}')" class="ios-btn w-10 h-10 hover:bg-white/20 tooltip" title="История"><i data-lucide="receipt" class="w-4 h-4"></i></button>
-                        <button onclick="openPublicCamera('${acc.login}', 'Камера: ${acc.addr}')" class="ios-btn w-10 h-10 hover:bg-white/20 tooltip"><i data-lucide="video" class="w-4 h-4"></i></button>
-                        <button onclick="openPayModal('${acc.login}')" class="ios-btn w-10 h-10 hover:bg-[#fcc300] hover:text-black transition-colors"><i data-lucide="credit-card" class="w-4 h-4"></i></button>
-                        <button onclick="removeAccount('${acc.login}')" class="ios-btn w-10 h-10 hover:bg-red-500 hover:text-white transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    </div>
-                </div>
-            `;
-            return div;
-        }
-
-        async function updateCardData(acc, card) {
-            const data = await window.api.fetchData(acc);
-            if (data && data.success) {
-                card.querySelector('.balance-val').innerText = data.balance;
-                card.querySelector('.user-name').innerText = data.name;
-                card.querySelector('.days-val').innerText = `${data.days} дн.`;
-                card.querySelector('.status-dot').className = 'status-dot w-2.5 h-2.5 rounded-full bg-[#30D158] shadow-[0_0_8px_#30D158]';
-
-                const creditData = await window.api.getCredit(acc);
-                const credBlock = document.getElementById(`credit-${acc.login}`);
-                if (creditData.success) {
-                    if (creditData.isActive) {
-                        credBlock.classList.remove('hidden');
-                        credBlock.className = "mb-4 p-3 bg-white/5 border border-white/10 rounded-xl flex justify-between items-center";
-                        credBlock.innerHTML = `<span class="text-xs text-gray-400 font-semibold">Обещанный платеж активен</span>`;
-                    } else if (parseFloat(data.balance) < 50) {
-                        credBlock.classList.remove('hidden');
-                        credBlock.querySelector('button').dataset.days = creditData.daysLimit;
-                        credBlock.querySelector('button').dataset.pass = acc.password;
-                    }
-                }
-            } else {
-                card.querySelector('.user-name').innerText = 'Ошибка входа';
-                card.querySelector('.status-dot').className = 'status-dot w-2.5 h-2.5 rounded-full bg-[#FF453A]';
+                notify('Объект удален', 'info');
             }
         }
 
         async function takeCredit(login) {
             const btn = document.querySelector(`#credit-${login} button`);
-            if (confirm(`Активировать доверительный платеж?\nЭто включит интернет мгновенно.`)) {
-                btn.innerText = "...";
+            if (confirm(`Включить интернет на ${btn.dataset.days} дней в долг?`)) {
+                btn.innerText = "Запрос...";
                 const success = await window.api.activateCredit({ login, password: btn.dataset.pass, days: btn.dataset.days });
-                if (success) { alert("Кредит активирован!"); refreshDashboard(); } 
-                else { alert("Ошибка активации."); btn.innerText = "ВЗЯТЬ"; }
+                if (success) { notify("Кредит активирован! Интернет включен.", "success"); refreshDashboard(); } 
+                else { notify("Ошибка активации кредита", "error"); btn.innerText = "ВЗЯТЬ"; }
             }
         }
 
+        /* --- STATS & PAY --- */
         async function openStats(login) {
             toggleModal('statsModal', true);
             const list = document.getElementById('statsList');
-            list.innerHTML = '<i data-lucide="loader" class="w-6 h-6 mx-auto animate-spin text-gray-500"></i>';
+            list.innerHTML = '<div class="flex justify-center py-10"><i data-lucide="loader" class="w-8 h-8 animate-spin text-gray-500"></i></div>';
             lucide.createIcons();
-            const accounts = await window.api.getAccounts();
-            const acc = accounts.find(a => a.login === login);
+            const accounts = await window.api.getAccounts(); const acc = accounts.find(a => a.login === login);
             if (!acc) return;
             const stats = await window.api.getStats(acc);
             list.innerHTML = '';
-            if (stats.length === 0) return list.innerHTML = '<p class="text-center text-sm text-gray-500">Нет данных о платежах</p>';
+            if (stats.length === 0) return list.innerHTML = '<p class="text-center text-sm text-gray-500 py-10">Нет данных о платежах</p>';
             stats.forEach(st => {
-                const el = document.createElement('div');
-                el.className = "p-3 bg-white/5 rounded-xl flex justify-between items-center";
-                el.innerHTML = `<div><p class="text-sm font-semibold">${st.date || ''}</p><p class="text-[10px] text-gray-400">${st.info || 'Пополнение'}</p></div><span class="text-[#30D158] font-bold">+${st.amount || 0} ₽</span>`;
+                const el = document.createElement('div'); el.className = "p-4 bg-white/5 border border-white/5 rounded-2xl flex justify-between items-center transition-colors hover:bg-white/10";
+                el.innerHTML = `<div><p class="text-base font-bold mb-1">${st.date || ''}</p><p class="text-xs text-gray-400 font-medium">${st.info || 'Пополнение баланса'}</p></div><span class="text-[#30D158] font-bold text-lg">+${st.amount || 0} ₽</span>`;
                 list.appendChild(el);
             });
         }
 
-        /* Pay Logic */
         function openPayModal(login) {
             currentPayLogin = login; document.getElementById('payTargetId').innerText = login; document.getElementById('inAmount').value = '';
             document.getElementById('payInputStep').classList.remove('hidden'); document.getElementById('qrContainer').classList.add('hidden'); document.getElementById('btnPaySBP').innerText = "Оплатить по СБП";
@@ -363,20 +434,20 @@
 
         async function processPayment(method) {
             const amount = document.getElementById('inAmount').value;
-            if (!amount || Number(amount) < 10) return alert("Минимум 10 ₽");
-            document.getElementById('btnPaySBP').innerText = "Генерация...";
+            if (!amount || Number(amount) < 10) return notify("Минимальная сумма 10 ₽", "error");
+            document.getElementById('btnPaySBP').innerText = "Генерация кода...";
             const res = await window.api.getPayLink({ login: currentPayLogin, amount, method });
             if (res.success && res.url) {
                 document.getElementById('payInputStep').classList.add('hidden'); document.getElementById('qrContainer').classList.remove('hidden');
                 const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(res.url)}&color=000000&bgcolor=ffffff`;
-                document.getElementById('qrImage').innerHTML = `<img src="${qrUrl}" class="w-full h-full rounded-xl">`;
-            } else { alert("Ошибка: " + res.msg); document.getElementById('btnPaySBP').innerText = "Оплатить по СБП"; }
+                document.getElementById('qrImage').innerHTML = `<img src="${qrUrl}" class="w-full h-full rounded-2xl">`;
+            } else { notify(res.msg, "error"); document.getElementById('btnPaySBP').innerText = "Оплатить по СБП"; }
         }
 
-        /* Cameras Logic */
+        /* --- CAMERAS --- */
         async function loadAllCameras() {
             const grid = document.getElementById('camerasGrid');
-            grid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10 font-medium"><i data-lucide="loader" class="w-8 h-8 mx-auto animate-spin mb-4"></i>Загрузка базы камер...</div>';
+            grid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-20 font-medium flex flex-col items-center"><i data-lucide="loader" class="w-10 h-10 animate-spin mb-4"></i>Загрузка сети камер...</div>';
             lucide.createIcons();
             ALL_CAMERAS = await window.api.getAllCameras();
             renderCameras(ALL_CAMERAS);
@@ -385,113 +456,105 @@
         function renderCameras(cameras) {
             const grid = document.getElementById('camerasGrid'); grid.innerHTML = '';
             cameras.forEach(cam => {
-                const el = document.createElement('div'); el.className = 'ios-card p-5 flex flex-col gap-4 justify-between';
-                el.innerHTML = `<div><span class="text-[10px] font-bold text-[#000] bg-[#fcc300] px-2 py-1 rounded-md uppercase tracking-wider">${cam.city}</span><p class="text-sm font-medium mt-3 leading-snug text-gray-200 line-clamp-2">${cam.title}</p></div><button onclick="openPublicCamera('${cam.stream}', '${cam.title.replace(/'/g, "\\'")}')" class="ios-btn bg-white/5 py-2.5 text-xs font-semibold hover:bg-[#fcc300] hover:text-black mt-2">Смотреть</button>`;
+                const el = document.createElement('div'); el.className = 'ios-card p-6 flex flex-col gap-4 justify-between min-h-[160px]';
+                el.innerHTML = `<div><span class="text-[10px] font-bold text-[#000] bg-[#fcc300] px-2.5 py-1 rounded-md uppercase tracking-wider">${cam.city}</span><p class="text-sm font-semibold mt-3 leading-snug text-white line-clamp-2">${cam.title}</p></div><button onclick="openPublicCamera('${cam.stream}', '${cam.title.replace(/'/g, "\\'")}')" class="ios-btn bg-white/5 py-3 text-xs font-semibold hover:bg-[#fcc300] hover:text-black mt-2 w-full">Смотреть поток</button>`;
                 grid.appendChild(el);
             });
         }
 
         function filterCameras(query) {
-            const filtered = ALL_CAMERAS.filter(cam => cam.title.toLowerCase().includes(query.toLowerCase()) || cam.city.toLowerCase().includes(query.toLowerCase()));
-            renderCameras(filtered);
+            renderCameras(ALL_CAMERAS.filter(cam => cam.title.toLowerCase().includes(query.toLowerCase()) || cam.city.toLowerCase().includes(query.toLowerCase())));
         }
 
         async function openPublicCamera(streamId, title) {
             const accs = await window.api.getAccounts();
-            if (accs.length === 0) return alert("Добавьте объект для авторизации");
+            if (accs.length === 0) return notify("Добавьте объект для просмотра камер", "error");
+            
             const titleEl = document.getElementById('camTitle'); if (titleEl) titleEl.innerText = title;
             const url = await window.api.getStreamUrl({ login: accs[0].login, password: accs[0].password, streamId });
+
             if (url) {
                 toggleModal('videoModal', true);
                 const videoElement = document.getElementById('videoPlayer'); 
                 if (Hls.isSupported()) {
                     if (window.hls) window.hls.destroy();
-                    const hls = new Hls({ maintainByRef: true, xhrSetup: function(xhr, url) { xhr.withCredentials = false; } });
+                    const hls = new Hls({ maintainByRef: true });
                     hls.loadSource(url); hls.attachMedia(videoElement); window.hls = hls;
                     hls.on(Hls.Events.MANIFEST_PARSED, () => videoElement.play().catch(()=>{}));
                 } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) { videoElement.src = url; }
-            } else { alert("Поток временно недоступен"); }
+            } else { notify("Поток временно недоступен", "error"); }
         }
         
         function closeVideo() { toggleModal('videoModal', false); const video = document.getElementById('videoPlayer'); video.pause(); video.src = ""; if (window.hls) { window.hls.destroy(); window.hls = null; } }
 
-        /* CHAT LOGIC */
+        /* --- CHAT LOGIC --- */
         let chatSocket = null; let activeRoom = null; let activeLogin = null;
-
         async function initChat() {
-            if(chatSocket) return;
-            const accs = await window.api.getAccounts();
-            if(accs.length === 0) return;
-            const login = accs[0].login.includes('user') ? accs[0].login : 'user'+accs[0].login;
-            const room = 'secret' + login;
+            if (chatSocket) return;
+            const accounts = await window.api.getAccounts();
+            if (accounts.length === 0) return updateChatStatus('#FF453A', 'Добавьте аккаунт для связи');
 
-            chatSocket = io("https://chat.powernet.com.ru", { transports: ['websocket'] });
+            const acc = accounts[0]; activeLogin = acc.login.includes("user") ? acc.login : `user${acc.login}`; activeRoom = `secret${activeLogin}`;
+            updateChatStatus('#fcc300', 'Установка защищенного соединения...');
             
-            chatSocket.on('connect', () => {
-                chatSocket.emit('auth', { login: login, name: accs[0].addr });
-                chatSocket.emit('roomid', { roomid: room, login: login });
-                chatSocket.emit('getMessages', { room: room });
+            chatSocket = io("wss://chat.powernet.com.ru", { path: "/chat/", reconnectionDelayMax: 5000, forceNew: true, rejectUnauthorized: false });
+
+            chatSocket.on("connect", () => {
+                updateChatStatus('#30D158', 'Защищенное соединение установлено');
+                chatSocket.emit("auth", { login: activeLogin, name: acc.addr });
+                chatSocket.emit("checkCount", { room: activeRoom, uuid: "ios-station", login: activeLogin });
+                chatSocket.emit("getMessages", { room: activeRoom });
+                setTimeout(() => chatSocket.emit("roomid", { roomid: activeRoom, login: activeLogin }), 1000);
             });
 
-            chatSocket.on('getMessages', (d) => {
-                const container = document.getElementById('chatMessages');
-                container.innerHTML = '';
-                if(d.chat) d.chat.forEach(m => {
-                    const msgEl = document.createElement('div');
-                    const isOut = m.username === login || !m.operator_name;
-                    msgEl.className = `msg-bubble ${isOut ? 'msg-out' : 'msg-in'}`;
-                    msgEl.innerText = m.message;
-                    container.appendChild(msgEl);
-                });
-                container.scrollTop = container.scrollHeight;
+            chatSocket.on("getMessages", (data) => { document.getElementById('chatMessages').innerHTML = ''; if (data.chat) data.chat.forEach(msg => appendMessage(msg)); scrollToBottom(); });
+            chatSocket.on(`add_mess_${activeRoom}`, (msg) => { 
+                appendMessage(msg); scrollToBottom(); 
+                if(document.getElementById('chatView').classList.contains('hidden-view')) {
+                    document.getElementById('chatBadge').classList.remove('hidden');
+                    notify("Новое сообщение от поддержки", "info");
+                } 
             });
-
-            chatSocket.on('add_mess_' + room, (m) => {
-                const msgEl = document.createElement('div');
-                msgEl.className = `msg-bubble msg-in`;
-                msgEl.innerText = m.message;
-                document.getElementById('chatMessages').appendChild(msgEl);
-            });
+            chatSocket.on("disconnect", () => updateChatStatus('#FF453A', 'Связь потеряна. Переподключение...'));
         }
 
         function appendMessage(msg) {
-            const container = document.getElementById('chatMessages');
-            const el = document.createElement('div');
-            let typeClass = "msg-in"; let author = msg.operator_name || "Оператор";
-
+            const container = document.getElementById('chatMessages'); const el = document.createElement('div');
+            let typeClass = "msg-in"; let author = msg.operator_name || "Оператор Powernet";
             if (msg.name === activeLogin || msg.username === activeLogin || !msg.operator_name) { typeClass = "msg-out"; author = ""; }
             if (msg.operator_name === "СИСТЕМА" || msg.username === "СИСТЕМА") { typeClass = "msg-sys"; author = ""; }
 
-            let timeStr = "";
-            if (msg.date) { const d = new Date(msg.date); d.setTime(d.getTime() - (4 * 60 * 60 * 1000)); timeStr = d.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'}); }
-
-            el.className = `flex flex-col fade-in mb-2`;
+            let timeStr = ""; if (msg.date) { const d = new Date(msg.date); d.setTime(d.getTime() - (4 * 60 * 60 * 1000)); timeStr = d.toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'}); }
+            el.className = `flex flex-col fade-in mb-4`;
             let html = '';
-            if (author && typeClass !== "msg-sys") html += `<span class="msg-author text-${typeClass === 'msg-in' ? 'left' : 'right'}">${author}</span>`;
+            if (author && typeClass !== "msg-sys") html += `<span class="msg-author text-${typeClass === 'msg-in' ? 'left text-gray-400' : 'right'}">${author}</span>`;
             html += `<div class="msg-bubble ${typeClass}">`;
-            if (msg.message.includes('<img')) { html += msg.message; } else { html += msg.message.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="underline text-blue-400">Link</a>'); }
+            if (msg.message.includes('<img')) { html += msg.message; } else { html += msg.message.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="underline font-bold">Ссылка</a>'); }
             if (timeStr && typeClass !== "msg-sys") html += `<div class="msg-time ${typeClass === 'msg-out' ? 'text-black/50' : 'text-white/40'}">${timeStr}</div>`;
             html += `</div>`;
-            
             el.innerHTML = html; container.appendChild(el);
         }
 
         function sendChatMessage() {
-            const input = document.getElementById('chatInput');
-            const text = input.value.trim();
+            const input = document.getElementById('chatInput'); const text = input.value.trim();
             if (!text || !chatSocket) return;
-            chatSocket.emit("new_message", { message: text, comment: "", commentName: "Station OS", className: "" });
+            chatSocket.emit("new_message", { message: text, comment: "", commentName: "Station OS Client", className: "" });
             input.value = ''; input.style.height = '';
         }
 
         function scrollToBottom() { const c = document.getElementById('chatMessages'); c.scrollTop = c.scrollHeight; }
         function updateChatStatus(color, text) {
             document.getElementById('chatStatusDot').style.background = color;
-            document.getElementById('chatStatusDot').style.boxShadow = color === '#30D158' ? `0 0 8px ${color}` : 'none';
+            document.getElementById('chatStatusDot').style.boxShadow = color === '#30D158' ? `0 0 10px ${color}` : 'none';
             document.getElementById('chatStatusText').innerText = text;
         }
 
+        // INIT & AUTO-UPDATE
         refreshDashboard();
+        setInterval(async () => {
+            const accounts = await window.api.getAccounts();
+            accounts.forEach(acc => { const card = document.getElementById(`card-${acc.login}`); if (card) updateCardData(acc, card); });
+        }, 60000);
     </script>
 </body>
 </html>

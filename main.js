@@ -7,13 +7,8 @@ const store = new Store();
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1250, height: 900,
-    backgroundColor: '#000000',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
-    }
+    width: 1200, height: 900, backgroundColor: '#000000', autoHideMenuBar: true,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') }
   });
   win.loadFile('index.html');
 }
@@ -33,25 +28,24 @@ app.whenReady().then(() => {
 });
 
 ipcMain.handle('get-accounts', () => store.get('accounts', []));
-ipcMain.handle('add-account', (e, acc) => {
-    const accs = store.get('accounts', []);
-    accs.push(acc);
-    store.set('accounts', accs);
+ipcMain.handle('add-account', (event, acc) => {
+    const accounts = store.get('accounts', []);
+    accounts.push(acc);
+    store.set('accounts', accounts);
     return true;
 });
-ipcMain.handle('delete-account', (e, login) => {
-    const accs = store.get('accounts', []);
-    store.set('accounts', accs.filter(a => String(a.login) !== String(login)));
+ipcMain.handle('delete-account', (event, login) => {
+    const accounts = store.get('accounts', []);
+    store.set('accounts', accounts.filter(acc => String(acc.login) !== String(login)));
     return true;
 });
 
-ipcMain.handle('fetch-data', (e, acc) => powernet.getFullData(acc.login, acc.password));
+ipcMain.handle('fetch-data', (event, acc) => powernet.getFullData(acc.login, acc.password));
 ipcMain.handle('get-all-cameras', () => powernet.getAllCameras());
-ipcMain.handle('get-stream-url', (e, c) => powernet.getStreamUrl(c.login, c.password, c.streamId));
-ipcMain.handle('get-pay-link', (e, d) => powernet.getPaymentLink(d.login, d.amount, d.method));
+ipcMain.handle('get-stream-url', (event, creds) => powernet.getStreamUrl(creds.login, creds.password, creds.streamId));
+ipcMain.handle('get-pay-link', (event, data) => powernet.getPaymentLink(data.login, data.amount, data.method));
+ipcMain.handle('get-credit', (event, acc) => powernet.getCreditStatus(acc.login, acc.password));
+ipcMain.handle('activate-credit', (event, data) => powernet.activateCredit(data.login, data.password, data.days));
+ipcMain.handle('get-stats', (event, acc) => powernet.getStatData(acc.login, acc.password));
 
-ipcMain.handle('get-credit', (e, acc) => powernet.getCreditStatus(acc.login, acc.password));
-ipcMain.handle('activate-credit', (e, d) => powernet.activateCredit(d.login, d.password, d.days));
-ipcMain.handle('get-stats', (e, acc) => powernet.getStatData(acc.login, acc.password));
-
-app.on('window-all-closed', () => app.quit());
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
