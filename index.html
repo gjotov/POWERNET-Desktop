@@ -6,7 +6,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@2.3.0/dist/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
@@ -14,7 +14,6 @@
 
         body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: #ffffff; -webkit-user-select: none; margin: 0; overflow-x: hidden; display: flex; flex-direction: column; min-height: 100vh; }
 
-        /* ВАУ-ФОН: Анимированный Mesh Gradient + Шум (Apple Style) */
         .ambient-bg {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2;
             background: 
@@ -56,7 +55,7 @@
         #dynamic-island.show { top: 30px; }
         .island-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
 
-        /* Скелетоны */
+        /* Skeletons */
         .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.02) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 12px; }
         @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
@@ -70,7 +69,6 @@
         .msg-author { font-size: 10px; opacity: 0.5; margin-bottom: 4px; margin-left: 8px; }
         .msg-time { font-size: 9px; opacity: 0.5; margin-top: 4px; text-align: right; }
 
-        /* Плавные переходы видов */
         .view-section { transition: opacity 0.4s ease, transform 0.4s ease; opacity: 1; transform: translateY(0); display: block; }
         .view-section.hidden-view { opacity: 0; transform: translateY(15px); pointer-events: none; position: absolute; visibility: hidden; }
 
@@ -95,7 +93,7 @@
     <header class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-10 gap-8">
         <div>
             <h1 class="text-4xl font-extrabold tracking-tight mb-6 flex items-center gap-3">
-                Powernet <span class="bg-[#fcc300] text-black text-[11px] px-2.5 py-1 rounded-md font-black tracking-widest uppercase">OS 2.0</span>
+                POWERNET <span class="bg-[#fcc300] text-black text-[11px] px-2.5 py-1 rounded-md font-black tracking-widest uppercase">Desktop</span>
             </h1>
             <div class="segmented-control">
                 <div id="nav-dashboard" onclick="switchView('dashboard')" class="segment active"><i data-lucide="layout-grid" class="w-4 h-4"></i> Объекты</div>
@@ -128,32 +126,42 @@
             <div id="camerasGrid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5"></div>
         </div>
 
-        <!-- CHAT -->
-        <div id="chatView" class="view-section hidden-view h-[calc(100vh-220px)]">
-            <div class="ios-card h-full flex flex-col overflow-hidden relative shadow-2xl max-w-4xl mx-auto">
-                <div class="p-6 bg-white/5 border-b border-white/5 flex justify-between items-center z-10">
-                    <div class="flex items-center gap-4">
-                        <div class="bg-[#fcc300]/20 p-3 rounded-full text-[#fcc300]"><i data-lucide="message-square" class="w-6 h-6"></i></div>
-                        <div>
-                            <h3 class="font-bold text-lg">Служба поддержки</h3>
-                            <div class="flex items-center gap-2 mt-1">
-                                <div id="chatStatusDot" class="w-2 h-2 rounded-full bg-gray-500 transition-colors"></div>
-                                <span id="chatStatusText" class="text-xs text-gray-400 font-medium">Ожидание...</span>
-                            </div>
+        <!-- CHAT VIEW -->
+    <div id="chatView" class="view-section hidden-view h-[calc(100vh-220px)]">
+        <div class="ios-card h-full flex flex-col overflow-hidden relative shadow-2xl max-w-4xl mx-auto">
+            
+            <!-- Chat header -->
+            <div class="p-6 bg-white/5 border-b border-white/5 flex flex-col z-10 flex-shrink-0">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="bg-[#fcc300]/20 p-3 rounded-full text-[#fcc300]">
+                        <i data-lucide="message-square" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg">Служба поддержки</h3>
+                        <div class="flex items-center gap-2 mt-1">
+                            <div id="chatStatusDot" class="w-2 h-2 rounded-full bg-gray-500 transition-colors"></div>
+                            <span id="chatStatusText" class="text-xs text-gray-400 font-medium">Ожидание...</span>
                         </div>
                     </div>
                 </div>
-                <div id="chatMessages" class="flex-grow p-8 overflow-y-auto flex flex-col gap-6"></div>
-                <div class="p-6 bg-white/5 border-t border-white/5 flex gap-4 items-end z-10">
-                    <textarea id="chatInput" rows="1" placeholder="Ваше сообщение..." class="ios-input py-4 px-6 resize-none rounded-3xl" oninput="this.style.height = '';this.style.height = Math.min(this.scrollHeight, 150) + 'px'" onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }"></textarea>
-                    <button onclick="sendChatMessage()" class="ios-btn-primary w-14 h-14 rounded-full flex-shrink-0"><i data-lucide="send" class="w-6 h-6"></i></button>
-                </div>
+                <!-- Selector -->
+                <div id="chatAccountSelector" class="flex gap-3 overflow-x-auto pb-1" style="scrollbar-width: none; display: none;"></div>
+            </div>
+
+            <!-- Chat messages -->
+            <div id="chatMessages" class="flex-grow p-8 overflow-y-auto flex flex-col gap-6"></div>
+            
+            <!-- Message input -->
+            <div class="p-6 bg-white/5 border-t border-white/5 flex gap-4 items-end z-10 flex-shrink-0">
+                <textarea id="chatInput" rows="1" placeholder="Ваше сообщение..." class="ios-input py-4 px-6 resize-none rounded-3xl" oninput="this.style.height = '';this.style.height = Math.min(this.scrollHeight, 150) + 'px'" onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }"></textarea>
+                <button onclick="sendChatMessage()" class="ios-btn-primary w-14 h-14 rounded-full flex-shrink-0"><i data-lucide="send" class="w-6 h-6"></i></button>
             </div>
         </div>
+    </div>
 
     </div>
 
-    <!-- === MODALS === -->
+    <!-- MODALS -->
     
     <!-- Add Modal -->
     <div id="addModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 transition-all duration-300 opacity-0">
@@ -213,7 +221,7 @@
         </div>
     </div>
 
-    <!-- === SCRIPTS === -->
+    <!-- SCRIPTS -->
     <script>
         let ALL_CAMERAS = [];
         let currentPayLogin = null;
@@ -246,8 +254,11 @@
         }
 
         async function switchView(view) {
+            
             ['dashboard', 'cameras', 'chat'].forEach(v => {
                 const el = document.getElementById(`${v}View`);
+                if (!el) return;
+                
                 if (v === view) {
                     el.classList.remove('hidden-view');
                     setTimeout(() => el.style.opacity = 1, 50);
@@ -258,10 +269,17 @@
             });
 
             document.querySelectorAll('.segment').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`nav-${view}`).classList.add('active');
+            const activeBtn = document.getElementById(`nav-${view}`);
+            if (activeBtn) activeBtn.classList.add('active');
             
-            if (view === 'cameras' && ALL_CAMERAS.length === 0) await loadAllCameras();
-            if (view === 'chat') { document.getElementById('chatBadge').classList.add('hidden'); if (!chatSocket) initChat(); }
+            if (view === 'cameras' && ALL_CAMERAS.length === 0) {
+                await loadAllCameras();
+            }
+            if (view === 'chat') { 
+                document.getElementById('chatBadge').classList.add('hidden'); 
+                
+                initChat(currentChatAccIndex); 
+            }
         }
 
         function getSkeletonCard() {
@@ -389,7 +407,7 @@ function createCard(acc) {
         }
 
         async function removeAccount(login) {
-            // Создаем свой кастомный confirm (для скорости пока оставим браузерный, но завернем в красивый тост)
+            
             if (confirm("Вы уверены, что хотите удалить объект?")) {
                 await window.api.deleteAccount(login);
                 const cardEl = document.getElementById(`card-${login}`);
@@ -408,7 +426,6 @@ function createCard(acc) {
             }
         }
 
-        /* --- STATS & PAY --- */
         async function openStats(login) {
             toggleModal('statsModal', true);
             const list = document.getElementById('statsList');
@@ -444,7 +461,6 @@ function createCard(acc) {
             } else { notify(res.msg, "error"); document.getElementById('btnPaySBP').innerText = "Оплатить по СБП"; }
         }
 
-        /* --- CAMERAS --- */
         async function loadAllCameras() {
             const grid = document.getElementById('camerasGrid');
             grid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-20 font-medium flex flex-col items-center"><i data-lucide="loader" class="w-10 h-10 animate-spin mb-4"></i>Загрузка сети камер...</div>';
@@ -487,39 +503,114 @@ function createCard(acc) {
         
         function closeVideo() { toggleModal('videoModal', false); const video = document.getElementById('videoPlayer'); video.pause(); video.src = ""; if (window.hls) { window.hls.destroy(); window.hls = null; } }
 
-        /* --- CHAT LOGIC --- */
-        let chatSocket = null; let activeRoom = null; let activeLogin = null;
-        async function initChat() {
-            if (chatSocket) return;
-            const accounts = await window.api.getAccounts();
-            if (accounts.length === 0) return updateChatStatus('#FF453A', 'Добавьте аккаунт для связи');
 
-            const acc = accounts[0]; activeLogin = acc.login.includes("user") ? acc.login : `user${acc.login}`; activeRoom = `secret${activeLogin}`;
-            updateChatStatus('#fcc300', 'Установка защищенного соединения...');
+        let chatSocket = null; 
+        let activeRoom = null; 
+        let activeLogin = null;
+        let currentChatAccIndex = 0;
+
+        function renderChatAccountSelector(accounts) {
+            const container = document.getElementById('chatAccountSelector');
+            if (!container) return;
             
-            chatSocket = io("wss://chat.powernet.com.ru", { path: "/chat/", reconnectionDelayMax: 5000, forceNew: true, rejectUnauthorized: false });
+            container.innerHTML = '';
+            
+            if (accounts.length <= 1) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'flex';
+
+            accounts.forEach((acc, index) => {
+                const btn = document.createElement('button');
+                const isActive = (index === currentChatAccIndex);
+                
+                btn.className = isActive 
+                    ? 'px-4 py-2 rounded-full text-xs font-bold bg-[#fcc300] text-black shadow-[0_4px_10px_rgba(252,195,0,0.3)] transition-all flex-shrink-0'
+                    : 'px-4 py-2 rounded-full text-xs font-semibold bg-white/10 text-white/50 hover:bg-white/20 hover:text-white transition-all flex-shrink-0 border border-white/5';
+                
+                btn.innerText = acc.addr || `Объект ${index + 1}`;
+                btn.onclick = () => {
+                    if (currentChatAccIndex !== index) {
+                        currentChatAccIndex = index;
+                        initChat(index);
+                    }
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        async function initChat(accIndex = 0) {
+            const accounts = await window.api.getAccounts();
+            if (accounts.length === 0) {
+                updateChatStatus('#FF453A', 'Нет добавленных объектов');
+                return;
+            }
+
+            if (accIndex >= accounts.length) accIndex = 0;
+            currentChatAccIndex = accIndex;
+            
+            renderChatAccountSelector(accounts);
+
+            const acc = accounts[accIndex];
+            activeLogin = acc.login.includes("user") ? acc.login : `user${acc.login}`; 
+            activeRoom = `secret${activeLogin}`;
+
+            const messagesContainer = document.getElementById('chatMessages');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '<div class="mx-auto mt-10"><i data-lucide="loader" class="w-8 h-8 animate-spin text-gray-500"></i></div>';
+                lucide.createIcons();
+            }
+
+            if (chatSocket) {
+                chatSocket.off();
+                chatSocket.disconnect();
+                chatSocket = null;
+            }
+
+            updateChatStatus('#fcc300', `Подключение (${acc.addr})...`);
+            
+            chatSocket = io("wss://chat.powernet.com.ru", { 
+                path: "/chat/", 
+                reconnectionDelayMax: 5000, 
+                forceNew: true, 
+                rejectUnauthorized: false 
+            });
 
             chatSocket.on("connect", () => {
-                updateChatStatus('#30D158', 'Защищенное соединение установлено');
+                updateChatStatus('#30D158', `В сети: ${acc.addr}`);
                 chatSocket.emit("auth", { login: activeLogin, name: acc.addr });
                 chatSocket.emit("checkCount", { room: activeRoom, uuid: "ios-station", login: activeLogin });
                 chatSocket.emit("getMessages", { room: activeRoom });
                 setTimeout(() => chatSocket.emit("roomid", { roomid: activeRoom, login: activeLogin }), 1000);
             });
 
-            chatSocket.on("getMessages", (data) => { document.getElementById('chatMessages').innerHTML = ''; if (data.chat) data.chat.forEach(msg => appendMessage(msg)); scrollToBottom(); });
+            chatSocket.on("getMessages", (data) => { 
+                if (messagesContainer) {
+                    messagesContainer.innerHTML = ''; 
+                    if (data.chat) data.chat.forEach(msg => appendMessage(msg)); 
+                    scrollToBottom(); 
+                }
+            });
+
             chatSocket.on(`add_mess_${activeRoom}`, (msg) => { 
-                appendMessage(msg); scrollToBottom(); 
-                if(document.getElementById('chatView').classList.contains('hidden-view')) {
-                    document.getElementById('chatBadge').classList.remove('hidden');
+                appendMessage(msg); 
+                scrollToBottom(); 
+                const chatView = document.getElementById('chatView');
+                const chatBadge = document.getElementById('chatBadge');
+                if(chatView && chatView.classList.contains('hidden-view') && chatBadge) {
+                    chatBadge.classList.remove('hidden');
                     notify("Новое сообщение от поддержки", "info");
                 } 
             });
+
             chatSocket.on("disconnect", () => updateChatStatus('#FF453A', 'Связь потеряна. Переподключение...'));
         }
 
         function appendMessage(msg) {
-            const container = document.getElementById('chatMessages'); const el = document.createElement('div');
+            const container = document.getElementById('chatMessages'); 
+            const el = document.createElement('div');
             let typeClass = "msg-in"; let author = msg.operator_name || "Оператор Powernet";
             if (msg.name === activeLogin || msg.username === activeLogin || !msg.operator_name) { typeClass = "msg-out"; author = ""; }
             if (msg.operator_name === "СИСТЕМА" || msg.username === "СИСТЕМА") { typeClass = "msg-sys"; author = ""; }
@@ -549,7 +640,20 @@ function createCard(acc) {
             document.getElementById('chatStatusText').innerText = text;
         }
 
-        // INIT & AUTO-UPDATE
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput'); const text = input.value.trim();
+            if (!text || !chatSocket) return;
+            chatSocket.emit("new_message", { message: text, comment: "", commentName: "Station OS Client", className: "" });
+            input.value = ''; input.style.height = '';
+        }
+
+        function scrollToBottom() { const c = document.getElementById('chatMessages'); c.scrollTop = c.scrollHeight; }
+        function updateChatStatus(color, text) {
+            document.getElementById('chatStatusDot').style.background = color;
+            document.getElementById('chatStatusDot').style.boxShadow = color === '#30D158' ? `0 0 10px ${color}` : 'none';
+            document.getElementById('chatStatusText').innerText = text;
+        }
+
         refreshDashboard();
         setInterval(async () => {
             const accounts = await window.api.getAccounts();

@@ -14,14 +14,23 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  const filter = { urls: ['https://*.powernet.com.ru/*', 'http://*.powernet.com.ru/*'] };
-  session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+  const filter = {
+    urls: [
+        'https://*.powernet.com.ru/*', 
+        'http://*.powernet.com.ru/*',
+        'wss://*.powernet.com.ru/*'
+    ]
+  };
+
+session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+
     if (details.url.includes('flussonic')) {
         details.requestHeaders['User-Agent'] = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36';
         details.requestHeaders['X-Requested-With'] = 'com.powermobile.hello';
         details.requestHeaders['Referer'] = 'https://cam.powernet.com.ru/';
         details.requestHeaders['Origin'] = 'https://cam.powernet.com.ru';
     }
+    
     callback({ requestHeaders: details.requestHeaders });
   });
   createWindow();
