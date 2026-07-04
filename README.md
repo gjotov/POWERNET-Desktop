@@ -25,7 +25,7 @@
 
 ---
 
-## 📁 Структура репозитория (Repository Tree)
+## Repository Tree
 
 Для предотвращения DMCA-страйков и сохранения безопасности сетевая логика взаимодействия с серверами провайдера изолирована в приватный модуль:
 
@@ -40,4 +40,20 @@ POWERNET_Desktop/
 ├── preload.js                   # Безопасный мост (Context Bridge)
 ├── package.json                 # Зависимости и скрипты сборки
 └── .gitignore                   # Защита от случайного слива приватных папок
+
+```
+---
+
+<img width="1250" height="623" alt="Screenshot_7" src="https://github.com/user-attachments/assets/9e2735e1-0f8b-4c06-8e50-73d267858902" />
+
+---
+
+<img width="1255" height="629" alt="Screenshot_8" src="https://github.com/user-attachments/assets/e42c9246-e61a-4c01-bfea-8f0a07a8a60f" />
+
+---
+
+<img width="1225" height="785" alt="Screenshot_9" src="https://github.com/user-attachments/assets/d92e00a5-5d66-4ee1-bc66-40b2f29db168" />
+
+
+
 
