@@ -30,8 +30,8 @@
 Для предотвращения DMCA-страйков и сохранения безопасности сетевая логика взаимодействия с серверами провайдера изолирована в приватный модуль:
 
 ```text
-POWERNET_OS/
-├── private_modules/             # Секретная папка (добавлена в .gitignore)
+POWERNET_Desktop/
+├── private_modules/            
 │   ├── powernet-api/
 │   │   └── index.js             # Логика работы с API
 │   └── powernet_map_dump.json   # Локальный дамп городских камер
